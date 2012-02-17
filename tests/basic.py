@@ -3,7 +3,7 @@ import unittest
 import graph
 
 def mySetUp(self):
-    self.g = graph.graph()
+    self.g = graph.Graph()
     self.original = self.g.add_node("person", name="original")
     self.friend = self.g.add_node("person", name="friend")
     self.g.add_edge(self.original,self.friend,"friend")
@@ -62,7 +62,7 @@ class TestAtomicConstructs(unittest.TestCase):
     def test_aSTAR(self):
         returnee = self.original("mother*")
         self.assertEqual(returnee, set([self.original, self.mother, self.friendlymother, self.grandmother]))
-
+    
 class TestParenthesis(unittest.TestCase):
     """
         Testing parenthesis by comparing them to what they would evaluate to,
@@ -77,7 +77,16 @@ class TestParenthesis(unittest.TestCase):
         with_ = self.original("(friend)")
         without = self.original("friend")
         self.assertEqual(with_, without)
+       
+    def test_single_prec(self):
+        with_ = self.original("friend|(mother->mother)")
+        without = self.original("friend") | self.original("mother->mother")
+        self.assertEqual(with_, without)
         
+    def test_single_prec2(self):
+        with_ = self.original("(friend->mother)|mother")
+        without = self.original("friend->mother") | self.original("mother")
+        self.assertEqual(with_, without)
         
 if __name__ == '__main__':
     unittest.main()
