@@ -30,7 +30,8 @@ import string
 import uuid
 
 class Tree(object):
-    def __init__(self,*args):
+    def __init__(self, *args, **kwargs):
+        self.rev = kwargs.get("rev", False)
         self.op = None
         self.lbranch = None
         self.rbranch = None
@@ -173,9 +174,27 @@ class Tree(object):
             return Tree("->", self, self[num-1])
         
     def test(self, first, second):
-        # TODO: come at from both edges,
+        # TODO: come at from both outgoing,
         #    or you might as well just use 'in' yourself.
         return second in self(first)
+    
+    @property    
+    def reverse(self):
+        rev = not self.rev
+        try:
+            revlbranch = self.lbranch.reverse
+        except AttributeError as e:
+            revlbranch = self.lbranch
+            
+        try:
+            revrbranch = self.rbranch.reverse
+        except AttributeError as e:
+            revrbranch = self.rbranch
+            
+        if self.op == "->":
+            return Tree("->", revrbranch, revlbranch, rev=rev)     
+        else:
+            return Tree(self.op, revlbranch, revrbranch, rev=rev)
         
 Path = Tree
         
@@ -183,7 +202,8 @@ class Node(object):
     def __init__(self, type, name=None):
         self.id = str(uuid.uuid4())
         self.type = type
-        self.edges = collections.defaultdict(set) #This line needs converting
+        self.outgoing = collections.defaultdict(set) #This line needs converting
+        self.incoming = collections.defaultdict(set) #This line needs converting
         self.name = name
         
     def __call__(self, query=None):
@@ -196,7 +216,10 @@ class Node(object):
             tree = query
             
         if tree.op == "atom":
-            return self.edges.get(tree.lbranch, set())
+            if tree.rev:
+                return self.incoming.get(tree.lbranch, set())
+            else:
+                return self.outgoing.get(tree.lbranch, set())
         elif tree.op == "self":
             return set([self])
         elif tree.op == "->":
@@ -226,7 +249,8 @@ class Node(object):
         
         elif tree.op == "!":
             not_nodes = self(tree.lbranch)
-            all_nodes = reduce(set.union, self.edges.values(), set())
+            values = self.incoming.values() if tree.rev else self.outgoing.values()
+            all_nodes = reduce(set.union, values, set())
             return all_nodes - not_nodes
         
     def __repr__(self):
@@ -242,7 +266,8 @@ class Graph(object):
         return new_node
         
     def add_edge(self, start_node, end_node, type):
-        start_node.edges[type].add(end_node)
+        start_node.outgoing[type].add(end_node)
+        end_node.incoming[type].add(start_node)
         
     def __call__(self, id):
         return self.nodes_by_id[id]

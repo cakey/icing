@@ -163,6 +163,28 @@ class TestQuestion(unittest.TestCase):
         Mother = Path("mother")
         self.assertFalse(Mother.test(self.me, self.friend))
         
+class TestReverse(unittest.TestCase):
+    def setUp(self):
+        mySetUp(self)
+        
+    def test_rev_a(self):
+        Mother = Path("mother")
+        MothersChild = Mother.reverse
+        self.assertEqual(MothersChild(self.mother), set([self.me]))
+        
+    def test_double_rev(self):
+        Friendstar = Path("friend+")
+        
+        Friendstar2 = Friendstar.reverse.reverse
+        self.assertEqual(Friendstar(self.me), Friendstar2(self.me))
+        
+    def test_rev_aa(self):
+        Doublef = Path("friend->friend")
+        
+        self.assertEqual(Doublef.reverse(self.friend_of_friend), set([self.me]))
+
+        
+        
 class TestChain(unittest.TestCase):
     def setUp(self):
         mySetUp(self)    
