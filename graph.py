@@ -1,29 +1,55 @@
 # TODO
-# |& operator
-# */+/num
-# paranthesis
-# optional type safety
-# chaining
-# want to query in reverse
-# hamcrest
-# limit on duration
-# pull out traverse logic into RelationshipQuery class to it can be
-#   'precompiled' and chained
-# can apply queries to sets (collection extends set, is callable)
-# somehow optimise the above
-# unit test bad input
+# d |& operator
+# d */+
+# d num
+# d paranthesis
+#   *args (tree based on how many args are passed)
+#   chaining
+#   hamcrest
+#   can apply queries to sets (collection extends set, is callable)
+#       do we return as dicts or sets?
+#   pull out traverse logic into RelationshipQuery class to it can be
+#       'precompiled' and chained
+#   want to query in reverse
+#   limit on duration
+#   unit test bad input
+#   optimise applying querys to sets
+#   optional type safety
+#   abstract out dicts/set to let them be backed by anything
+#   back the dicts/sets by redis
+#   consider the best way to persist dicts/sets
+#   track route
+#   indexing
+#   'are these two nodes linked by this path'
+#   relationships with more than one root (mutual friends)
+
 
 import collections
+import string
 import uuid
 
 class Tree(object):
-    def __init__(self,query, cop=None, cbranches=None):
+    def __init__(self,*args):
         self.op = None
         self.lbranch = None
         self.rbranch = None
         
-        #"c->a|(a->b)|b"
+        if len(args) == 0:
+            self.op = 'self'
+            return
+            
+        if len(args) == 1:
+            query = args[0]
+            if not query:
+                self.op = 'self'
+                return
+                
         
+        if query.startswith("!"):
+            self.op = "!"
+            self.lbranch = Tree(query[1:])
+            return
+            
         if query.startswith("(") and query.endswith(")"):
             tree = Tree(query[1:-1])
             self.op, self.lbranch, self.rbranch = tree.op, tree.lbranch, tree.rbranch
@@ -88,20 +114,94 @@ class Tree(object):
             self.rbranch = startree
             return
         
+        if query[-1] in string.digits:
+            num = int(query[-1])
+            if num == 0:
+                self.op = "self"
+                return
+            elif num == 1:
+                tree = Tree(query[0:-1])
+                self.op, self.lbranch, self.rbranch = tree.op, tree.lbranch, tree.rbranch
+                return
+            else: 
+                tree = Tree(query[0:-1])
+                self.op = "->"
+                self.lbranch = tree
+                self.rbranch = Tree(query[0:-1] + str(num-1))
+                return
+        
         self.op = "atom"
         self.lbranch = query
             
     def __repr__(self):
         return "%s(%s,%s)" % (self.op, self.lbranch, self.rbranch)
         
+    def __call__(self, thing):
+        if isinstance(thing, Tree):
+            tree = Tree()
+            tree.op = "->"
+            tree.lbranch = thing
+            tree.rbranch = self
+            return tree
+        else:
+            node = thing
+        return node(self)
+        
+    def __or__(self, other):
+        tree = Tree()
+        tree.op = "|"
+        tree.lbranch = self
+        tree.rbranch = other
+        return tree
+        
+    def __and__(self, other):
+        tree = Tree()
+        tree.op = "&"
+        tree.lbranch = self
+        tree.rbranch = other
+        return tree
+        
+    def __getitem__(self, num):
+        if num == '*':
+            tree = Tree()
+            tree.op = '*'
+            tree.lbranch = self
+            return tree
+            
+        if num == '+':
+            tree = Tree()
+            tree.op = "->"
+            tree.lbranch = self
+            startree = Tree()
+            startree.op = "*"
+            startree.lbranch = self
+            tree.rbranch = startree
+            return tree
+            
+        if num == 0:
+            return Tree()
+        elif num == 1:
+            return self
+        else:
+            tree = Tree()
+            tree.op = "->"
+            tree.lbranch = self
+            tree.rbranch = self[num-1]
+            return tree
+        
+Path = Tree
+        
 class Node(object):
     def __init__(self, type, name=None):
         self.id = str(uuid.uuid4())
         self.type = type
-        self.edges = collections.defaultdict(set)
+        self.edges = collections.defaultdict(set) #This line needs converting
         self.name = name
         
-    def __call__(self, query):
+    def __call__(self, query=None):
+        if query is None:
+            return set([self])
+            
         if isinstance(query, str):
             tree = Tree(query)
         else:
@@ -109,16 +209,18 @@ class Node(object):
             
         if tree.op == "atom":
             return self.edges.get(tree.lbranch, set())
-            
+        elif tree.op == "self":
+            return set([self])
         elif tree.op == "->":
-            final_nodes = set()
-            next_nodes = self(tree.lbranch)
+            match_all = set()
+            match_left = self(tree.lbranch)
 
-            for node in next_nodes:
-                final_nodes |= node(tree.rbranch)
+            for node in match_left:
+                match_right = node(tree.rbranch)
+                match_all |= match_right
                 
-            return final_nodes            
-            #return set.union(*[node(tree.rbranch) for node in self(tree.lbranch)])
+            return match_all            
+            #return set.union(set(),*[node(tree.rbranch) for node in self(tree.lbranch)])
         
         elif tree.op == "&":
             return self(tree.lbranch) & self(tree.rbranch)
@@ -131,19 +233,20 @@ class Node(object):
             for node in self(tree.lbranch):
                 final_nodes |= node(tree)
             return final_nodes
-            
-        elif tree.op == "+":
-            final_nodes = set()
-            for node in self(tree.lbranch):
-                final_nodes |= node(tree)
-            return final_nodes
-            
+            #return reduce(set.union, [node(tree) for node in self(tree.lbranch)], set([self]))
+            #return set.union(set([self]),*[node(tree) for node in self(tree.lbranch)])
+        
+        elif tree.op == "!":
+            not_nodes = self(tree.lbranch)
+            all_nodes = reduce(set.union, self.edges.values(), set())
+            return all_nodes - not_nodes
+        
     def __repr__(self):
         return "%s" % (self.name,)
                 
 class Graph(object):
     def __init__(self):
-        self.nodes_by_id = dict()
+        self.nodes_by_id = dict() # This line needs converting
         
     def add_node(self, type, name=None):
         new_node = Node(type, name)
@@ -152,3 +255,6 @@ class Graph(object):
         
     def add_edge(self, start_node, end_node, type):
         start_node.edges[type].add(end_node)
+        
+    def __call__(self, id):
+        return self.nodes_by_id[id]
