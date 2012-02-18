@@ -44,6 +44,16 @@ class Tree(object):
                 self.op = 'self'
                 return
                 
+        if len(args) == 2:
+            self.op = args[0]
+            self.lbranch = args[1]
+            return
+            
+        if len(args) == 3:
+            self.op = args[0]
+            self.lbranch = args[1]
+            self.rbranch = args[2]
+            return 
         
         if query.startswith("!"):
             self.op = "!"
@@ -78,7 +88,7 @@ class Tree(object):
                 self.op = "->" if before.endswith("->") else before[-1]
                 self.lbranch = before[0:-2] if before.endswith("->") else before[0:-1]
             if after:
-                tree = Tree('')
+                tree = Tree()
                 tree.op = "->" if after.startswith("->") else after[0]
                 tree.lbranch = during
                 tree.rbranch = after[2:] if after.startswith("->") else after[1:]
@@ -108,10 +118,7 @@ class Tree(object):
             self.op = "->"
             tree = Tree(query[0:-1])
             self.lbranch = tree
-            startree = Tree('')
-            startree.op = "*"
-            startree.lbranch = tree
-            self.rbranch = startree
+            self.rbranch = Tree('*', tree)
             return
         
         if query[-1] in string.digits:
@@ -138,56 +145,31 @@ class Tree(object):
         
     def __call__(self, thing):
         if isinstance(thing, Tree):
-            tree = Tree()
-            tree.op = "->"
-            tree.lbranch = thing
-            tree.rbranch = self
-            return tree
+            tree = thing
+            return Tree('->', tree, self)
         else:
             node = thing
         return node(self)
         
     def __or__(self, other):
-        tree = Tree()
-        tree.op = "|"
-        tree.lbranch = self
-        tree.rbranch = other
-        return tree
+        return Tree("|",  self, other)
         
     def __and__(self, other):
-        tree = Tree()
-        tree.op = "&"
-        tree.lbranch = self
-        tree.rbranch = other
-        return tree
+        return Tree("&", self, other)
         
     def __getitem__(self, num):
         if num == '*':
-            tree = Tree()
-            tree.op = '*'
-            tree.lbranch = self
-            return tree
+            return Tree("*", self)
             
         if num == '+':
-            tree = Tree()
-            tree.op = "->"
-            tree.lbranch = self
-            startree = Tree()
-            startree.op = "*"
-            startree.lbranch = self
-            tree.rbranch = startree
-            return tree
+            return Tree("->", self, Tree("*", self))
             
         if num == 0:
             return Tree()
         elif num == 1:
             return self
         else:
-            tree = Tree()
-            tree.op = "->"
-            tree.lbranch = self
-            tree.rbranch = self[num-1]
-            return tree
+            return Tree("->", self, self[num-1])
         
 Path = Tree
         
