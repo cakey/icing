@@ -3,25 +3,26 @@
 # d */+
 # d num
 # d paranthesis
-#   *args (tree based on how many args are passed)
-#   chaining
+# d *args (tree based on how many args are passed)
+# d chaining
+# d pull out traverse logic into RelationshipQuery class to it can be
+# d     'precompiled' and chained
+#   test coverage
 #   hamcrest
-#   can apply queries to sets (collection extends set, is callable)
-#       do we return as dicts or sets?
-#   pull out traverse logic into RelationshipQuery class to it can be
-#       'precompiled' and chained
 #   want to query in reverse
-#   limit on duration
 #   unit test bad input
 #   optimise applying querys to sets
 #   optional type safety
 #   abstract out dicts/set to let them be backed by anything
+#   relationships with more than one root (mutual friends)
 #   back the dicts/sets by redis
 #   consider the best way to persist dicts/sets
+#   'are these two nodes linked by this path'
+#   can apply queries to sets (collection extends set, is callable)
+#       do we return as dicts or sets?
+#   limit on duration
 #   track route
 #   indexing
-#   'are these two nodes linked by this path'
-#   relationships with more than one root (mutual friends)
 
 
 import collections
@@ -170,6 +171,11 @@ class Tree(object):
             return self
         else:
             return Tree("->", self, self[num-1])
+        
+    def test(self, first, second):
+        # TODO: come at from both edges,
+        #    or you might as well just use 'in' yourself.
+        return second in self(first)
         
 Path = Tree
         

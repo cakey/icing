@@ -3,15 +3,6 @@ import unittest
 import graph
 from graph import Path
 
-# Mother(Mother)
-# Mother & Mother
-# Mother | Mother
-# Mother[0-9]
-# Mother['*'] Mother.star Mother('*') Mother^6 Mother^'*'
-# Mother['+'] Mother.plus Mother('+') Mother**6
-# 
-
-
 
 def mySetUp(self):
     self.g = graph.Graph()
@@ -159,6 +150,19 @@ class TestById(unittest.TestCase):
         orignode = self.g(self.me.id)
         self.assertEqual(orignode, self.me)
 
+class TestQuestion(unittest.TestCase):
+    def setUp(self):
+        mySetUp(self)
+        
+    def test_q_TRUE(self):
+        Mother = Path("mother")
+        self.assertTrue(Mother.test(self.me, self.mother))
+        #self.assertTrue(self.mother in Mother(self.me))
+        
+    def test_q_FALSE(self):
+        Mother = Path("mother")
+        self.assertFalse(Mother.test(self.me, self.friend))
+        
 class TestChain(unittest.TestCase):
     def setUp(self):
         mySetUp(self)    
