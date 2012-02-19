@@ -2,10 +2,10 @@ import unittest
 
 import graph
 from graph import Path
-
+import storage
 
 def mySetUp(self):
-    self.g = graph.Graph()
+    self.g = graph.Graph(storage.PythonStorage)
     self.me = self.g.add_node("person", name="me")
     self.friend = self.g.add_node("person", name="friend")
     self.g.add_edge(self.me,self.friend,"friend")

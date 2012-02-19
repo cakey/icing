@@ -25,9 +25,10 @@
 #   indexing
 
 
-import collections
 import string
 import uuid
+
+from storage import PythonStorage
 
 class Tree(object):
     def __init__(self, *args, **kwargs):
@@ -199,11 +200,11 @@ class Tree(object):
 Path = Tree
         
 class Node(object):
-    def __init__(self, type, name=None):
+    def __init__(self, type, name=None, storage=None):
         self.id = str(uuid.uuid4())
         self.type = type
-        self.outgoing = collections.defaultdict(set) #This line needs converting
-        self.incoming = collections.defaultdict(set) #This line needs converting
+        self.outgoing = storage.defaultdict(storage.set) 
+        self.incoming = storage.defaultdict(storage.set)
         self.name = name
         
     def __call__(self, query=None):
@@ -231,7 +232,6 @@ class Node(object):
                 match_all |= match_right
                 
             return match_all            
-            #return set.union(set(),*[node(tree.rbranch) for node in self(tree.lbranch)])
         
         elif tree.op == "&":
             return self(tree.lbranch) & self(tree.rbranch)
@@ -244,12 +244,11 @@ class Node(object):
             for node in self(tree.lbranch):
                 final_nodes |= node(tree)
             return final_nodes
-            #return reduce(set.union, [node(tree) for node in self(tree.lbranch)], set([self]))
-            #return set.union(set([self]),*[node(tree) for node in self(tree.lbranch)])
         
         elif tree.op == "!":
             not_nodes = self(tree.lbranch)
             values = self.incoming.values() if tree.rev else self.outgoing.values()
+            
             all_nodes = reduce(set.union, values, set())
             return all_nodes - not_nodes
         
@@ -257,11 +256,14 @@ class Node(object):
         return "%s" % (self.name,)
                 
 class Graph(object):
-    def __init__(self):
-        self.nodes_by_id = dict() # This line needs converting
+    def __init__(self, storage=None):
+        if storage is None:
+            storage = PythonStorage
+        self.storage = storage()
+        self.nodes_by_id = self.storage.dict()
         
     def add_node(self, type, name=None):
-        new_node = Node(type, name)
+        new_node = Node(type, name, self.storage)
         self.nodes_by_id[new_node.id] = new_node
         return new_node
         
