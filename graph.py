@@ -198,78 +198,63 @@ class Tree(object):
             return Tree(self.op, revlbranch, revrbranch, rev=rev)
         
 Path = Tree
-        
-class Node(object):
-    def __init__(self, type, name=None, storage=None):
-        self.id = str(uuid.uuid4())
-        self.type = type
-        self.outgoing = storage.defaultdict(storage.set) 
-        self.incoming = storage.defaultdict(storage.set)
-        self.name = name
-        
-    def __call__(self, query=None):
-        if query is None:
-            return set([self])
-            
-        if isinstance(query, str):
-            tree = Tree(query)
-        else:
-            tree = query
-            
-        if tree.op == "atom":
-            if tree.rev:
-                return self.incoming.get(tree.lbranch, set())
-            else:
-                return self.outgoing.get(tree.lbranch, set())
-        elif tree.op == "self":
-            return set([self])
-        elif tree.op == "->":
-            match_all = set()
-            match_left = self(tree.lbranch)
 
-            for node in match_left:
-                match_right = node(tree.rbranch)
-                match_all |= match_right
-                
-            return match_all            
+
+def traverse(node, query=None):
+    if query is None:
+        return set([node])
         
-        elif tree.op == "&":
-            return self(tree.lbranch) & self(tree.rbranch)
+    if isinstance(query, str):
+        tree = Tree(query)
+    else:
+        tree = query
         
-        elif tree.op == "|":
-            return self(tree.lbranch) | self(tree.rbranch)
-        
-        elif tree.op == "*":
-            final_nodes = set([self])
-            for node in self(tree.lbranch):
-                final_nodes |= node(tree)
-            return final_nodes
-        
-        elif tree.op == "!":
-            not_nodes = self(tree.lbranch)
-            values = self.incoming.values() if tree.rev else self.outgoing.values()
+    if tree.op == "atom":
+        if tree.rev:
+            return node.get_inbound_nodes(tree.lbranch)
+        else:
+            return node.get_outbound_nodes(tree.lbranch)
+    elif tree.op == "self":
+        return set([node])
+    elif tree.op == "->":
+        match_all = set()
+        match_left = node(tree.lbranch)
+
+        for node in match_left:
+            match_right = node(tree.rbranch)
+            match_all |= match_right
             
-            all_nodes = reduce(set.union, values, set())
-            return all_nodes - not_nodes
-        
-    def __repr__(self):
-        return "%s" % (self.name,)
+        return match_all            
+    
+    elif tree.op == "&":
+        return node(tree.lbranch) & node(tree.rbranch)
+    
+    elif tree.op == "|":
+        return node(tree.lbranch) | node(tree.rbranch)
+    
+    elif tree.op == "*":
+        final_nodes = set([node])
+        for node in node(tree.lbranch):
+            final_nodes |= node(tree)
+        return final_nodes
+    
+    elif tree.op == "!":
+        not_nodes = node(tree.lbranch)
+        all_nodes = node.get_inbound_nodes() if tree.rev else node.get_outbound_nodes()
+        return all_nodes - not_nodes
                 
 class Graph(object):
     def __init__(self, storage=None):
         if storage is None:
             storage = PythonStorage
         self.storage = storage()
-        self.nodes_by_id = self.storage.dict()
         
     def add_node(self, type, name=None):
-        new_node = Node(type, name, self.storage)
-        self.nodes_by_id[new_node.id] = new_node
-        return new_node
+        
+        return self.storage.add_node(type, name)
         
     def add_edge(self, start_node, end_node, type):
-        start_node.outgoing[type].add(end_node)
-        end_node.incoming[type].add(start_node)
+        self.storage.add_edge(start_node, end_node, type)
         
     def __call__(self, id):
-        return self.nodes_by_id[id]
+        return self.storage.get_node(id)
