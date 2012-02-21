@@ -1,2 +1,4 @@
 ENV/*
+htmlcov/*
 *.pyc
+.coverage

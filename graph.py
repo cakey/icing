@@ -242,7 +242,33 @@ def traverse(node, query=None):
         not_nodes = node(tree.lbranch)
         all_nodes = node.get_inbound_nodes() if tree.rev else node.get_outbound_nodes()
         return all_nodes - not_nodes
-                
+
+class Node(object):
+    def __init__(self, node_id, storage):
+        self.id = node_id
+        self.storage = storage
+        
+    def get_outbound_nodes(self, type=None):
+        return self.storage.get_outbound_nodes(self.id, type)
+        
+    def get_inbound_nodes(self, type=None):
+        return self.storage.get_inbound_nodes(self.id, type) 
+        
+    def __call__(self, query=None):
+        return  traverse(self, query)
+          
+    def __getattr__(self, key):
+        return self.storage.get_property(self.id, key)
+    
+    def __repr__(self):
+        return "%s: %s: %s" % (self.name, uuid.UUID(self.id).int, self.id)
+
+    def __eq__(x, y):
+        return x.id == y.id
+        
+    def __hash__(self):
+        return uuid.UUID(self.id).int
+            
 class Graph(object):
     def __init__(self, storage=None):
         if storage is None:

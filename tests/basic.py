@@ -1,15 +1,17 @@
 import unittest
 
-import graph
-from graph import Path
-import storage
+import nose
+
+from .. import graph
+from ..graph import Path
+from .. import storage as Storage
 
 class RedisBack(object):
-    storage = storage.RedisStorage
+    storage = Storage.RedisStorage
     #storage = storage.PythonStorage
     
 class PythonBack(object):
-    storage = storage.PythonStorage
+    storage = Storage.PythonStorage
 
 def mySetUp(self):
     self.storage().flush()
@@ -36,8 +38,7 @@ def mySetUp(self):
     self.grandmother = self.g.add_node("person", name="grandmother")
     self.g.add_edge(self.mother, self.grandmother, "mother")
     
-    
-class TestAtomicConstructs(object):
+class AtomicConstructs(object):
     def setUp(self):
         mySetUp(self)
     
@@ -105,13 +106,13 @@ class TestAtomicConstructs(object):
         compare2 = self.me("friend->friend->friend")
         self.assertEqual(compare1, compare2)
 
-class PyTestAtomicConstructs(TestAtomicConstructs, unittest.TestCase, PythonBack):
+class PyTestAtomicConstructs(AtomicConstructs, unittest.TestCase, PythonBack):
     pass
 
-class ReTestAtomicConstructs(TestAtomicConstructs, unittest.TestCase, RedisBack):
+class ReTestAtomicConstructs(AtomicConstructs, unittest.TestCase, RedisBack):
     pass
     
-class TestParenthesis(object):
+class Parenthesis(object):
     """
         Testing parenthesis by comparing them to what they would evaluate to,
         so that they are more isolated from screwups in the other atomic
@@ -146,13 +147,13 @@ class TestParenthesis(object):
         compare2 = self.me("friend")
         self.assertEqual(compare1, compare2) 
 
-class PyTestParenthesis(TestParenthesis, unittest.TestCase, PythonBack):
+class PyTestParenthesis(Parenthesis, unittest.TestCase, PythonBack):
     pass
 
-class ReTestParenthesis(TestParenthesis, unittest.TestCase, RedisBack):
+class ReTestParenthesis(Parenthesis, unittest.TestCase, RedisBack):
     pass
         
-class TestComposite(object):
+class Composite(object):
 
     def setUp(self):
         mySetUp(self)
@@ -162,13 +163,13 @@ class TestComposite(object):
         compare2 = self.me("friend")
         self.assertEqual(compare1, compare2)        
 
-class PyTestComposite(TestComposite, unittest.TestCase, PythonBack):
+class PyTestComposite(Composite, unittest.TestCase, PythonBack):
     pass
 
-class ReTestComposite(TestComposite, unittest.TestCase, RedisBack):
+class ReTestComposite(Composite, unittest.TestCase, RedisBack):
     pass
         
-class TestById(object):
+class ById(object):
     def setUp(self):
         mySetUp(self)
         
@@ -176,13 +177,13 @@ class TestById(object):
         orignode = self.g(self.me.id)
         self.assertEqual(orignode, self.me)
 
-class PyTestById(TestById, unittest.TestCase, PythonBack):
+class PyTestById(ById, unittest.TestCase, PythonBack):
     pass
 
-class ReTestById(TestById, unittest.TestCase, RedisBack):
+class ReTestById(ById, unittest.TestCase, RedisBack):
     pass        
         
-class TestQuestion(object):
+class Question(object):
     def setUp(self):
         mySetUp(self)
         
@@ -195,13 +196,13 @@ class TestQuestion(object):
         Mother = Path("mother")
         self.assertFalse(Mother.test(self.me, self.friend))
 
-class PyQuestion(TestQuestion, unittest.TestCase, PythonBack):
+class PyQuestion(Question, unittest.TestCase, PythonBack):
     pass
 
-class ReQuestion(TestQuestion, unittest.TestCase, RedisBack):
+class ReQuestion(Question, unittest.TestCase, RedisBack):
     pass     
         
-class TestReverse(object):
+class Reverse(object):
     def setUp(self):
         mySetUp(self)
         
@@ -221,13 +222,13 @@ class TestReverse(object):
         
         self.assertEqual(Doublef.reverse(self.friend_of_friend), set([self.me]))
 
-class PyReverse(TestReverse, unittest.TestCase, PythonBack):
+class PyReverse(Reverse, unittest.TestCase, PythonBack):
     pass
 
-class ReReverse(TestReverse, unittest.TestCase, RedisBack):
+class ReReverse(Reverse, unittest.TestCase, RedisBack):
     pass     
         
-class TestChain(object):
+class Chain(object):
     def setUp(self):
         mySetUp(self)    
     
@@ -298,10 +299,10 @@ class TestChain(object):
         new = Friend[2](self.me)
         self.assertEqual(bench, new)
 
-class PyChain(TestChain, unittest.TestCase, PythonBack):
+class PyChain(Chain, unittest.TestCase, PythonBack):
     pass
 
-class ReChain(TestChain, unittest.TestCase, RedisBack):
+class ReChain(Chain, unittest.TestCase, RedisBack):
     pass   
 
 #testclasses = {TestAtomicConstructs, TestParenthesis, TestComposite, TestById, TestById, TestQuestion, TestReverse, TestChain}
