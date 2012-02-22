@@ -24,7 +24,7 @@
 #   track route
 #   indexing
 
-
+import collections
 import string
 import uuid
 
@@ -202,7 +202,7 @@ Path = Tree
 
 def traverse(node, query=None):
     if query is None:
-        return set([node])
+        return {node:[]}
         
     if isinstance(query, str):
         tree = Tree(query)
@@ -210,38 +210,62 @@ def traverse(node, query=None):
         tree = query
         
     if tree.op == "atom":
+        type = tree.lbranch
         if tree.rev:
-            return node.get_inbound_nodes(tree.lbranch)
+            return {node:[(type,node)] for node in node.get_inbound_nodes(type)[type]}
         else:
-            return node.get_outbound_nodes(tree.lbranch)
+            return {node:[(type,node)] for node in node.get_outbound_nodes(type)[type]}
     elif tree.op == "self":
-        return set([node])
+        return {node:[]}
     elif tree.op == "->":
-        match_all = set()
+        match_all = collections.defaultdict(list)
         match_left = node(tree.lbranch)
 
-        for node in match_left:
-            match_right = node(tree.rbranch)
-            match_all |= match_right
+        for lnode, lpath in match_left.iteritems():
+            match_right = lnode(tree.rbranch)
+            for rnode,rpath in match_right.iteritems():
+                match_all[rnode] = lpath+rpath
             
         return match_all            
     
     elif tree.op == "&":
-        return node(tree.lbranch) & node(tree.rbranch)
+        left = node(tree.lbranch)
+        right = node(tree.rbranch)
+        returnee = {}
+        for key, path in left.iteritems():
+            if key in right:
+                returnee[key] = path
+        return returnee
     
     elif tree.op == "|":
-        return node(tree.lbranch) | node(tree.rbranch)
+        left = node(tree.lbranch)
+        right = node(tree.rbranch)
+        left.update(right)
+        return left
     
     elif tree.op == "*":
-        final_nodes = set([node])
-        for node in node(tree.lbranch):
-            final_nodes |= node(tree)
+        final_nodes = {node:[]}
+        for lnode, lpath in node(tree.lbranch).iteritems():
+            for rnode, rpath in lnode(tree).iteritems():
+                final_nodes[rnode] = lpath+rpath
         return final_nodes
     
     elif tree.op == "!":
+        # set of nodes with paths
         not_nodes = node(tree.lbranch)
-        all_nodes = node.get_inbound_nodes() if tree.rev else node.get_outbound_nodes()
-        return all_nodes - not_nodes
+        
+        # dict... type:[nodes]
+        all_nodes_dict = node.get_inbound_nodes() if tree.rev else node.get_outbound_nodes()
+        
+        actual_nodes = dict()
+        
+        # for each node edge, only keep it if it wasnt in the path
+        for type, nodes in all_nodes_dict.iteritems():
+            for node in nodes:
+                if node not in not_nodes:
+                    actual_nodes[node] = [(type,node)]
+                    
+        return actual_nodes
 
 class Node(object):
     def __init__(self, node_id, storage):
@@ -261,8 +285,8 @@ class Node(object):
         return self.storage.get_property(self.id, key)
     
     def __repr__(self):
-        return "%s: %s: %s" % (self.name, uuid.UUID(self.id).int, self.id)
-
+        #return "%s: %s: %s" % (self.name, uuid.UUID(self.id).int, self.id)
+        return self.name
     def __eq__(x, y):
         return x.id == y.id
         

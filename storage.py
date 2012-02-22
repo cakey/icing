@@ -35,15 +35,17 @@ class PythonStorage(object):
     
     def _get_nodes(self, id, direction, type=None):
         if type is None:
-            node_ids = reduce(set.union, self.edges[direction][id].values(), set())
+            returnees = collections.defaultdict(set)
+            for _type, _nodes in self.edges[direction][id].iteritems():
+                for _node in _nodes:
+                    returnees[_type].add(graph.Node(_node, self))
+            return returnees
         else:
+            returnees = collections.defaultdict(set)
             node_ids = self.edges[direction][id][type]
-            
-        returnees = set()
-        for member in node_ids:
-            returnees.add(graph.Node(member, self))
-            
-        return returnees
+            for node_id in node_ids:
+                returnees[type].add(graph.Node(node_id, self))
+            return returnees
         
         
     def get_outbound_nodes(self, node_id, type=None):
@@ -71,10 +73,10 @@ class RedisStorage(object):
         
     def add_edge(self, start_node, end_node, type):
         self.rclient.sadd("%s:outgoing:%s" % (start_node.id, type), end_node.id)
-        self.rclient.sadd("%s:outgoing" % start_node.id, end_node.id)
+        self.rclient.sadd("%s:outgoing" % start_node.id, type)
         
         self.rclient.sadd("%s:incoming:%s" % (end_node.id, type), start_node.id)
-        self.rclient.sadd("%s:incoming" % end_node.id, start_node.id)
+        self.rclient.sadd("%s:incoming" % end_node.id, type)
     
     def get_node(self, node_id):
         return graph.Node(node_id, self)
@@ -83,14 +85,17 @@ class RedisStorage(object):
         return self.rclient.hget(node_id, key)
     
     def _get_nodes(self, node_id, direction, type=None):
+        returnees = collections.defaultdict(set)       
         if type is None:
-            members = self.rclient.smembers("%s:%s" % (node_id,direction))
+            types   = self.rclient.smembers("%s:%s" % (node_id,direction))
+            for _type in types:
+                members = self.rclient.smembers("%s:%s:%s" % (node_id, direction, _type))
+                for member in members:
+                    returnees[_type].add(graph.Node(member, self))
         else:
             members = self.rclient.smembers("%s:%s:%s" % (node_id, direction, type))
-        
-        returnees = set()
-        for member in members:
-            returnees.add(graph.Node(member, self))
+            for member in members:
+                returnees[type].add(graph.Node(member, self))
             
         return returnees
     
