@@ -146,7 +146,7 @@ class Parenthesis(object):
         self.assertEqual(with_, without)
 
     def test_not(self):
-        raise SkipTest()
+        #raise SkipTest()
 
         compare1 = self.me("(!(!(friend)))")
         compare2 = self.me("friend")
@@ -164,11 +164,15 @@ class Composite(object):
         mySetUp(self)
         
     def test_NOTNOT(self):
-        raise SkipTest()
+        #raise SkipTest()
 
         compare1 = self.me("!!friend")
         compare2 = self.me("friend")
-        self.assertEqual(compare1, compare2)        
+        self.assertEqual(compare1, compare2)       
+
+    def test_NOTab(self):
+        compare1 = self.me("!(friend->friend)")
+        self.assertEqual(set(compare1.keys()), set([self.grandmother, self.eof]))
 
 class PyTestComposite(Composite, unittest.TestCase, PythonBack):
     pass

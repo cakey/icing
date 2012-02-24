@@ -7,21 +7,21 @@
 # d chaining
 # d pull out traverse logic into RelationshipQuery class to it can be
 # d     'precompiled' and chained
-#   test coverage
+# d test coverage
 #   hamcrest
-#   want to query in reverse
+# d want to query in reverse
 #   unit test bad input
 #   optimise applying querys to sets
 #   optional type safety
-#   abstract out dicts/set to let them be backed by anything
+# d abstract out dicts/set to let them be backed by anything
 #   relationships with more than one root (mutual friends)
-#   back the dicts/sets by redis
+# d back the dicts/sets by redis
 #   consider the best way to persist dicts/sets
-#   'are these two nodes linked by this path'
+# d 'are these two nodes linked by this path'
 #   can apply queries to sets (collection extends set, is callable)
 #       do we return as dicts or sets?
 #   limit on duration
-#   track route
+# d track route
 #   indexing
 
 import collections
@@ -48,8 +48,33 @@ class Tree(object):
                 return
                 
         if len(args) == 2:
-            self.op = args[0]
-            self.lbranch = args[1]
+        
+            op = args[0]
+            tree = args[1]
+            if op == "!":
+                if tree.op == "&":
+                    self.op = "|"
+                    self.lbranch = Tree("!", tree.lbranch)
+                    self.rbranch = Tree("!", tree.rbranch)
+                elif tree.op == "|":
+                    self.op == "&"
+                    self.lbranch = Tree("!", tree.lbranch)
+                    self.rbranch = Tree("!", tree.rbranch)
+                elif tree.op == "!":
+                    self.op = tree.lbranch.op
+                    self.lbranch = tree.lbranch.lbranch
+                    self.rbranch = tree.lbranch.rbranch
+                elif tree.op == "->":
+                    newtree = Tree("|", Tree("->", tree.lbranch, Tree("!", tree.rbranch)),
+                                        Tree("|", Tree("->", Tree("!", tree.lbranch),  tree.rbranch),
+                                                Tree("->", Tree("!", tree.lbranch), Tree("!", tree.rbranch))))               
+                    self.op, self.lbranch, self.rbranch = newtree.op, newtree.lbranch, newtree.rbranch
+                else:
+                    self.op = "!"
+                    self.lbranch = tree
+            else:
+                self.op = op
+                self.lbranch = tree
             return
             
         if len(args) == 3:
@@ -59,8 +84,8 @@ class Tree(object):
             return 
         
         if query.startswith("!"):
-            self.op = "!"
-            self.lbranch = Tree(query[1:])
+            tree = Tree("!", Tree(query[1:]))
+            self.op, self.lbranch, self.rbranch = tree.op, tree.lbranch, tree.rbranch
             return
             
         if query.startswith("(") and query.endswith(")"):
