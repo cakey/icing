@@ -83,6 +83,10 @@ class AtomicConstructs(object):
         returnee = self.me("mother*")
         self.assertEqual(set(returnee.keys()), set([self.me, self.mother, self.friendlymother, self.grandmother]))
     
+    def test_aBUTNOTb(self):
+        returnee = self.me("friend-mother")
+        self.assertEqual(set(returnee.keys()), set([self.friend]))
+    
     def test_NOTa(self):
         returnee = self.me("!friend")
         self.assertEqual(set(returnee.keys()), set([self.mother]))
@@ -280,6 +284,17 @@ class Chain(object):
         returnee3 = (Friend & Mother)(self.me)
         self.assertEqual(returnee1, returnee3)
 
+    def test_c_aBUTNOTb(self):
+        Friend = Path("friend")
+        Mother = Path("mother")
+        FriendButNotMother = Friend - Mother
+        returnee1 = self.me("friend-mother")
+        returnee2 = FriendButNotMother(self.me)
+        self.assertEqual(returnee1, returnee2)
+        
+        returnee3 = (Friend - Mother)(self.me)
+        self.assertEqual(returnee1, returnee3)
+        
     def test_c_aPLUS(self):
         Mother = Path("mother")
         returnee1 = self.me("mother+")

@@ -129,7 +129,7 @@ class Tree(object):
             return
         
         # the order here defines precendence
-        for op in ["->", "&", "|"]:
+        for op in ["->", "&", "|", "-"]:
             if op in query:
                 self.op = op
                 branches = query.split(op)
@@ -184,6 +184,9 @@ class Tree(object):
         
     def __and__(self, other):
         return Tree("&", self, other)
+        
+    def __sub__(self, other):
+        return Tree("-", self, other)
         
     def __getitem__(self, num):
         if num == '*':
@@ -252,6 +255,16 @@ def traverse(node, query=None):
                 match_all[rnode] = lpath+rpath
             
         return match_all            
+    
+    elif tree.op == "-":
+        left = node(tree.lbranch)
+        right = node(tree.rbranch)
+        returnee = {}
+        for key, path in left.iteritems():
+            if key not in right:
+                returnee[key] = path
+        return returnee
+    
     
     elif tree.op == "&":
         left = node(tree.lbranch)
