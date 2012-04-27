@@ -14,7 +14,7 @@
 #   optimise applying querys to sets
 #   optional type safety
 # d abstract out dicts/set to let them be backed by anything
-#   relationships with more than one root (mutual friends)
+# d relationships with more than one root (mutual friends)
 # d back the dicts/sets by redis
 #   consider the best way to persist dicts/sets
 # d 'are these two nodes linked by this path'
@@ -136,18 +136,19 @@ class Tree(object):
                 self.lbranch = Tree(branches[0])
                 self.rbranch = Tree(op.join(branches[1:]))
                 return
-        
-        if query.endswith("*"):
-            self.op = "*"
-            self.lbranch = Tree(query[0:-1])
-            return
+        for op in ('*','+'):
+            if query.endswith(op):
+                self.op = op
+                self.lbranch = Tree(query[0:-1])
+                return
             
-        if query.endswith("+"):
-            self.op = "->"
-            tree = Tree(query[0:-1])
-            self.lbranch = tree
-            self.rbranch = Tree('*', tree)
-            return
+        # causes issues with recursion:
+        #if query.endswith("+"):
+        #    self.op = "->"
+        #    tree = Tree(query[0:-1])
+        #    self.lbranch = tree
+        #    self.rbranch = Tree('*', tree)
+        #    return
         
         if query[-1] in string.digits:
             num = int(query[-1])
@@ -227,10 +228,36 @@ class Tree(object):
         
 Path = Tree
 
+class MultiPath(object):
+    def __init__(self, *paths):
+        self.paths = paths
+      
+    def __call__(self, *nodes):
+        results = []
+        for path, node in zip(self.paths, nodes):
+            results.append(path(node))
+        
+        matching_nodes = {}
+        for node in results[0]:
+            if all(node in result for result in results):
+                matching_nodes[node] = [result[node] for result in results]
+                
+        return matching_nodes
 
-def traverse(node, query=None):
-    if query is None:
+
+def traverse(node, query=None, ancestors=None):
+    # d initialise if no ancestors
+    #   append self to ancestors
+    #   pass ancestors through traverse
+    #   if self in ancestors - short circuit
+    
+    if ancestors is None:
+        ancestors = set()
+        
+    if query is None:# or node in ancestors:
         return {node:[]}
+    #else:
+    #    ancestors.add(node)
         
     if isinstance(query, str):
         tree = Tree(query)
@@ -245,30 +272,30 @@ def traverse(node, query=None):
             return {node:[(type,node)] for node in node.get_outbound_nodes(type)[type]}
     elif tree.op == "self":
         return {node:[]}
+        
     elif tree.op == "->":
         match_all = collections.defaultdict(list)
-        match_left = node(tree.lbranch)
+        match_left = traverse(node,tree.lbranch)
 
         for lnode, lpath in match_left.iteritems():
-            match_right = lnode(tree.rbranch)
+            match_right = traverse(lnode,tree.rbranch)
             for rnode,rpath in match_right.iteritems():
                 match_all[rnode] = lpath+rpath
             
         return match_all            
     
     elif tree.op == "-":
-        left = node(tree.lbranch)
-        right = node(tree.rbranch)
+        left = traverse(node, tree.lbranch)
+        right = traverse(node, tree.rbranch)
         returnee = {}
         for key, path in left.iteritems():
             if key not in right:
                 returnee[key] = path
         return returnee
     
-    
     elif tree.op == "&":
-        left = node(tree.lbranch)
-        right = node(tree.rbranch)
+        left = traverse(node, tree.lbranch)
+        right = traverse(node, tree.rbranch)
         returnee = {}
         for key, path in left.iteritems():
             if key in right:
@@ -276,21 +303,39 @@ def traverse(node, query=None):
         return returnee
     
     elif tree.op == "|":
-        left = node(tree.lbranch)
-        right = node(tree.rbranch)
+        left = traverse(node, tree.lbranch)
+        right = traverse(node, tree.rbranch)
         left.update(right)
         return left
     
+    elif tree.op == "+":
+        if node in ancestors:
+            return {}
+        ancestors.add(node)
+
+        match_left = traverse(node,tree.lbranch)
+
+        final_nodes = {}
+        
+        tree.op = "*"
+        for lnode, lpath in match_left.iteritems():
+            for rnode, rpath in traverse(lnode, tree, ancestors).iteritems():
+                final_nodes[rnode] = lpath+rpath
+        return final_nodes
+           
     elif tree.op == "*":
         final_nodes = {node:[]}
-        for lnode, lpath in node(tree.lbranch).iteritems():
-            for rnode, rpath in lnode(tree).iteritems():
+        if node in ancestors:
+            return {}
+        ancestors.add(node)
+        for lnode, lpath in traverse(node, tree.lbranch, ancestors).iteritems():
+            for rnode, rpath in traverse(lnode, tree, ancestors).iteritems():
                 final_nodes[rnode] = lpath+rpath
         return final_nodes
     
     elif tree.op == "!":
         # set of nodes with paths
-        not_nodes = node(tree.lbranch)
+        not_nodes = traverse(node, tree.lbranch)
         
         # dict... type:[nodes]
         all_nodes_dict = node.get_inbound_nodes() if tree.rev else node.get_outbound_nodes()

@@ -4,7 +4,7 @@ import nose
 from nose.plugins.skip import SkipTest
 
 from .. import graph
-from ..graph import Path
+from ..graph import Path, MultiPath
 from .. import storage as Storage
 
 class RedisBack(object):
@@ -23,6 +23,7 @@ def mySetUp(self):
     
     self.friend_of_friend = self.g.add_node("person", name="fof")
     self.g.add_edge(self.friend, self.friend_of_friend, "friend")
+    self.g.add_edge(self.friend_of_friend, self.friend, "friend")
     self.eof = self.g.add_node("event", name="eof")
     self.g.add_edge(self.friend, self.eof, "attending")
 
@@ -61,7 +62,9 @@ class AtomicConstructs(object):
         
     def test_aaa(self):
         returnee = self.me("friend->friend->friend")
-        self.assertEqual(set(returnee.keys()), set([self.fofof]))
+        self.assertEqual(set(returnee.keys()), set([self.fofof, self.friend])) 
+        # issue here that we end up doubling back on nodes weve seen!
+        # you would solve this with an if
         
     def test_ab(self):
         returnee = self.me("friend->attending")
@@ -111,11 +114,8 @@ class AtomicConstructs(object):
         compare2 = self.me("friend->friend->friend")
         self.assertEqual(compare1, compare2)
 
-class PyTestAtomicConstructs(AtomicConstructs, unittest.TestCase, PythonBack):
-    pass
-
-class ReTestAtomicConstructs(AtomicConstructs, unittest.TestCase, RedisBack):
-    pass
+class PyTestAtomicConstructs(AtomicConstructs, unittest.TestCase, PythonBack):    pass
+class ReTestAtomicConstructs(AtomicConstructs, unittest.TestCase, RedisBack):    pass
     
 class Parenthesis(object):
     """
@@ -156,11 +156,8 @@ class Parenthesis(object):
         compare2 = self.me("friend")
         self.assertEqual(compare1, compare2) 
 
-class PyTestParenthesis(Parenthesis, unittest.TestCase, PythonBack):
-    pass
-
-class ReTestParenthesis(Parenthesis, unittest.TestCase, RedisBack):
-    pass
+class PyTestParenthesis(Parenthesis, unittest.TestCase, PythonBack):    pass
+class ReTestParenthesis(Parenthesis, unittest.TestCase, RedisBack):    pass
         
 class Composite(object):
 
@@ -178,6 +175,29 @@ class Composite(object):
         compare1 = self.me("!(friend->friend)")
         self.assertEqual(set(compare1.keys()), set([self.grandmother, self.eof]))
 
+    def test_recursion_when_STAR_applied_to_inner_path(self):
+        """ Test that when we apply * to a smaller path, where the * would recurse infinitely, that it stops
+            correctly when it reaches a node it's already seen, but its allowed to see the
+            ancestor node within the inner path!
+        """
+        Friendstar = Path("friend*")
+        Friendstar2 = Path("(friend|lol)*")
+        
+        rec_friends = Friendstar(self.me)
+        rec_friends2 = Friendstar2(self.me)
+        
+        self.assertEqual(set(rec_friends.keys()), set(rec_friends2.keys()))
+        
+    def test_recursion_with_PLUS(self):
+        """ Test that PLUS doesn't include itself on a recursive path! """
+        # This fails because we convert + to (->*)
+        Friendplus = Path("friend+")
+        
+        rec_friends = Friendplus(self.friend_of_friend)
+        
+        self.assertEqual(set(rec_friends.keys()), set([self.friend, self.fofof]))
+
+        
 class PyTestComposite(Composite, unittest.TestCase, PythonBack):
     pass
 
@@ -227,7 +247,7 @@ class Reverse(object):
         self.assertEqual(set(MothersChild(self.mother).keys()), set([self.me]))
         
     def test_double_rev(self):
-        Friendstar = Path("friend+")
+        Friendstar = Path("friend*")
         
         Friendstar2 = Friendstar.reverse.reverse
         self.assertEqual(Friendstar(self.me), Friendstar2(self.me))
@@ -235,7 +255,7 @@ class Reverse(object):
     def test_rev_aa(self):
         Doublef = Path("friend->friend")
         
-        self.assertEqual(set(Doublef.reverse(self.friend_of_friend).keys()), set([self.me]))
+        self.assertEqual(set(Doublef.reverse(self.friend_of_friend).keys()), set([self.me, self.friend_of_friend]))
 
 class PyReverse(Reverse, unittest.TestCase, PythonBack):
     pass
@@ -343,12 +363,26 @@ class Track(object):
         
         self.assertEqual(path[self.friend_of_friend], [("friend", self.friend),("friend", self.friend_of_friend)])
         
-class PyTrack(Track, unittest.TestCase, PythonBack):
-    pass
-   
-class ReTrack(Track, unittest.TestCase, RedisBack):
-    pass
+class PyTrack(Track, unittest.TestCase, PythonBack):    pass
+class ReTrack(Track, unittest.TestCase, RedisBack):    pass
 
+class MultiPathTest(object):
+    def setUp(self):
+        mySetUp(self)
+        
+    def test_mp_multipath1(self):
+        Friend = Path("friend")
+        MutualFriend = MultiPath(Friend, Friend)
+        mutual_friends1 = MutualFriend(self.me, self.friend_of_friend)
+        mutual_friends2 = set(Friend(self.me).keys()) & set(Friend(self.friend_of_friend).keys())
+        
+        self.assertEqual(set(mutual_friends1.keys()), mutual_friends2)
+        self.assertEqual(set(mutual_friends1.keys()), set([self.friend]))
+        
+    
+class PyTestMultiPath(MultiPathTest, unittest.TestCase, PythonBack):    pass
+class ReTestMultiPath(MultiPathTest, unittest.TestCase, RedisBack):    pass
+    
 #testclasses = {TestAtomicConstructs, TestParenthesis, TestComposite, TestById, TestById, TestQuestion, TestReverse, TestChain}
 #backs = {RedisBack, PythonBack}
 #allsuites = []
