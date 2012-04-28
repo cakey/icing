@@ -23,6 +23,10 @@
 #   limit on duration
 # d track route
 #   indexing
+#   get/set properties
+#   querying based on property
+#   neo4j wrapper! (lol) (write a wrapper for each layer?)
+#   allow traverser etc to default to storage implementation if exposed...
 
 import collections
 import string
@@ -202,7 +206,10 @@ class Tree(object):
             return self
         else:
             return Tree("->", self, self[num-1])
-        
+    
+    def if_has(self, path):
+        return Tree("if", self, path)
+    
     def test(self, first, second):
         # TODO: come at from both outgoing,
         #    or you might as well just use 'in' yourself.
@@ -349,7 +356,20 @@ def traverse(node, query=None, ancestors=None):
                     actual_nodes[node] = [(type,node)]
                     
         return actual_nodes
-
+        
+    elif tree.op == "if":
+        candidates = traverse(node, tree.lbranch)
+        
+        matching_nodes = {}
+        for candidate, path in candidates.iteritems():
+            if traverse(candidate, tree.rbranch):
+                matching_nodes[candidate] = path
+              
+        return matching_nodes
+        
+    else:
+        raise ValueError("Tree operation not supported: {%s}." % tree.op)
+        
 class Node(object):
     def __init__(self, node_id, storage):
         self.id = node_id

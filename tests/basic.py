@@ -9,7 +9,7 @@ from .. import storage as Storage
 
 class RedisBack(object):
     storage = Storage.RedisStorage
-    #storage = storage.PythonStorage
+    #storage = Storage.PythonStorage
     
 class PythonBack(object):
     storage = Storage.PythonStorage
@@ -113,7 +113,6 @@ class AtomicConstructs(object):
         compare1 = self.me("friend3")
         compare2 = self.me("friend->friend->friend")
         self.assertEqual(compare1, compare2)
-
 class PyTestAtomicConstructs(AtomicConstructs, unittest.TestCase, PythonBack):    pass
 class ReTestAtomicConstructs(AtomicConstructs, unittest.TestCase, RedisBack):    pass
     
@@ -155,7 +154,6 @@ class Parenthesis(object):
         compare1 = self.me("(!(!(friend)))")
         compare2 = self.me("friend")
         self.assertEqual(compare1, compare2) 
-
 class PyTestParenthesis(Parenthesis, unittest.TestCase, PythonBack):    pass
 class ReTestParenthesis(Parenthesis, unittest.TestCase, RedisBack):    pass
         
@@ -196,13 +194,8 @@ class Composite(object):
         rec_friends = Friendplus(self.friend_of_friend)
         
         self.assertEqual(set(rec_friends.keys()), set([self.friend, self.fofof]))
-
-        
-class PyTestComposite(Composite, unittest.TestCase, PythonBack):
-    pass
-
-class ReTestComposite(Composite, unittest.TestCase, RedisBack):
-    pass
+class PyTestComposite(Composite, unittest.TestCase, PythonBack):    pass
+class ReTestComposite(Composite, unittest.TestCase, RedisBack):    pass
         
 class ById(object):
     def setUp(self):
@@ -211,12 +204,8 @@ class ById(object):
     def test_single(self):
         orignode = self.g(self.me.id)
         self.assertEqual(orignode, self.me)
-
-class PyTestById(ById, unittest.TestCase, PythonBack):
-    pass
-
-class ReTestById(ById, unittest.TestCase, RedisBack):
-    pass        
+class PyTestById(ById, unittest.TestCase, PythonBack):    pass
+class ReTestById(ById, unittest.TestCase, RedisBack):    pass        
         
 class Question(object):
     def setUp(self):
@@ -230,12 +219,8 @@ class Question(object):
     def test_q_FALSE(self):
         Mother = Path("mother")
         self.assertFalse(Mother.test(self.me, self.friend))
-
-class PyQuestion(Question, unittest.TestCase, PythonBack):
-    pass
-
-class ReQuestion(Question, unittest.TestCase, RedisBack):
-    pass     
+class PyQuestion(Question, unittest.TestCase, PythonBack):    pass
+class ReQuestion(Question, unittest.TestCase, RedisBack):    pass     
         
 class Reverse(object):
     def setUp(self):
@@ -256,12 +241,8 @@ class Reverse(object):
         Doublef = Path("friend->friend")
         
         self.assertEqual(set(Doublef.reverse(self.friend_of_friend).keys()), set([self.me, self.friend_of_friend]))
-
-class PyReverse(Reverse, unittest.TestCase, PythonBack):
-    pass
-
-class ReReverse(Reverse, unittest.TestCase, RedisBack):
-    pass     
+class PyReverse(Reverse, unittest.TestCase, PythonBack):    pass
+class ReReverse(Reverse, unittest.TestCase, RedisBack):    pass     
         
 class Chain(object):
     def setUp(self):
@@ -345,11 +326,8 @@ class Chain(object):
         new = Friend[2](self.me)
         self.assertEqual(bench, new)
 
-class PyChain(Chain, unittest.TestCase, PythonBack):
-    pass
-
-class ReChain(Chain, unittest.TestCase, RedisBack):
-    pass  
+class PyChain(Chain, unittest.TestCase, PythonBack):    pass
+class ReChain(Chain, unittest.TestCase, RedisBack):    pass  
 
 class Track(object):
     def setUp(self):
@@ -379,10 +357,25 @@ class MultiPathTest(object):
         self.assertEqual(set(mutual_friends1.keys()), mutual_friends2)
         self.assertEqual(set(mutual_friends1.keys()), set([self.friend]))
         
-    
 class PyTestMultiPath(MultiPathTest, unittest.TestCase, PythonBack):    pass
 class ReTestMultiPath(MultiPathTest, unittest.TestCase, RedisBack):    pass
     
+class IFTest(object):
+    def setUp(self):
+        mySetUp(self)
+        
+    def test_if_lol(self):
+        Mother = Path("mother")
+        Mothers_with_Mother = Mother.if_has(Mother)
+        
+        results = Mothers_with_Mother(self.me)
+        
+        self.assertEqual(set(results.keys()), set([self.mother]))
+  
+class PyIFTest(IFTest, unittest.TestCase, PythonBack):    pass
+class ReIFTest(IFTest, unittest.TestCase, RedisBack):    pass
+
+   
 #testclasses = {TestAtomicConstructs, TestParenthesis, TestComposite, TestById, TestById, TestQuestion, TestReverse, TestChain}
 #backs = {RedisBack, PythonBack}
 #allsuites = []
