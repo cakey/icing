@@ -57,8 +57,11 @@ class PythonStorage(object):
     def get_inbound_nodes(self, node_id, type=None):
         return self._get_nodes(node_id, "incoming", type)
         
-    def get_node(self, id):
-        return self.id_dict[id]
+    def get_node(self, node_id):
+        if node_id in self.id_dict:
+            return self.id_dict[node_id]
+        else:    
+            raise ValueError("Node with ID {%s} does not exist." % node_id)
         
 
 class RedisStorage(object):
@@ -82,7 +85,10 @@ class RedisStorage(object):
         self.rclient.sadd("%s:incoming" % end_node.id, type)
     
     def get_node(self, node_id):
-        return graph.Node(node_id, self)
+        if self.rclient.sismember(self.IDS_HASH, node_id):
+            return graph.Node(node_id, self)
+        else:
+            raise ValueError("Node with ID {%s} does not exist." % node_id)
 
     def set_property(self, node_id, key, value):
         return self.rclient.hset(node_id, key, value)

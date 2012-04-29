@@ -438,5 +438,8 @@ class Graph(object):
     def add_edge(self, start_node, end_node, type):
         self.storage.add_edge(start_node, end_node, type)
         
-    def __call__(self, id):
-        return self.storage.get_node(id)
+    def __call__(self, node_id):
+        return self.storage.get_node(node_id)
+        
+    def flush(self):
+       self.storage.flush() 

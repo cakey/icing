@@ -15,8 +15,8 @@ class PythonBack(object):
     storage = Storage.PythonStorage
 
 def mySetUp(self):
-    self.storage().flush()
     self.g = graph.Graph(self.storage)
+    self.g.flush()
     self.me = self.g.add_node("person", name="me")
     self.friend = self.g.add_node("person", name="friend")
     self.g.add_edge(self.me,self.friend,"friend")
@@ -429,7 +429,21 @@ class Properties(object):
     
 class PyProperties(Properties, unittest.TestCase, PythonBack):    pass
 class ReProperties(Properties, unittest.TestCase, RedisBack):    pass
-  
+
+
+class StorageTest(object):
+
+    def test_flush_works(self):
+        self.g = graph.Graph(self.storage)
+        self.g.flush()
+        self.me = self.g.add_node("person", name="me")
+        self.assertEqual(self.g(self.me.id), self.me)
+        id_to_find = self.me.id
+        self.g.flush()
+        self.assertRaises(ValueError, self.g, id)
+    
+class PyStorageTest(StorageTest, unittest.TestCase, PythonBack):    pass
+class ReStorageTest(StorageTest, unittest.TestCase, RedisBack):    pass
    
 #testclasses = {TestAtomicConstructs, TestParenthesis, TestComposite, TestById, TestById, TestQuestion, TestReverse, TestChain}
 #backs = {RedisBack, PythonBack}
