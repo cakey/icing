@@ -26,8 +26,11 @@ class PythonStorage(object):
         self.propertydict[new_node.id]["name"] = name
         return new_node
     
-    def get_property(self, id, key):
-        return self.propertydict[id].get(key, None)
+    def set_property(self, node_id, key, value):
+        self.propertydict[node_id][key] = value
+    
+    def get_property(self, node_id, key):
+        return self.propertydict[node_id].get(key, None)
     
     def add_edge(self, start_node, end_node, type):
         self.edges['outgoing'][start_node.id][type].add(end_node.id)
@@ -80,7 +83,10 @@ class RedisStorage(object):
     
     def get_node(self, node_id):
         return graph.Node(node_id, self)
-    
+
+    def set_property(self, node_id, key, value):
+        return self.rclient.hset(node_id, key, value)
+        
     def get_property(self, node_id, key):
         return self.rclient.hget(node_id, key)
     

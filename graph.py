@@ -36,10 +36,24 @@ from storage import PythonStorage
 
 class Tree(object):
     def __init__(self, *args, **kwargs):
-        self.rev = kwargs.get("rev", False)
+        self._rev = kwargs.get("_rev", False)
         self.op = None
         self.lbranch = None
         self.rbranch = None
+        
+        props = [key for key in kwargs if key != '_rev']
+        if len(props) == 1:
+            self.op = 'prop'
+            self.lbranch = props[0]
+            self.rbranch = kwargs[props[0]]
+            return
+        elif len(props) >= 1:
+            self.op = '&'
+            propdict = {props[0]:kwargs[props[0]]}
+            self.lbranch = Tree(**propdict)
+            del kwargs[props[0]]
+            self.rbranch = Tree(**kwargs)
+            return 
         
         if len(args) == 0:
             self.op = 'self'
@@ -207,8 +221,11 @@ class Tree(object):
         else:
             return Tree("->", self, self[num-1])
     
-    def if_has(self, path):
-        return Tree("if", self, path)
+    def if_has(self, *args, **kwargs):
+        if len(args) == 0 and len(kwargs) > 0:
+            return Tree("if", self, Tree(**kwargs))
+        else:
+            return Tree("if", self, args[0])
     
     def test(self, first, second):
         # TODO: come at from both outgoing,
@@ -217,7 +234,7 @@ class Tree(object):
     
     @property    
     def reverse(self):
-        rev = not self.rev
+        _rev = not self._rev
         try:
             revlbranch = self.lbranch.reverse
         except AttributeError as e:
@@ -229,9 +246,9 @@ class Tree(object):
             revrbranch = self.rbranch
             
         if self.op == "->":
-            return Tree("->", revrbranch, revlbranch, rev=rev)     
+            return Tree("->", revrbranch, revlbranch, _rev=_rev)     
         else:
-            return Tree(self.op, revlbranch, revrbranch, rev=rev)
+            return Tree(self.op, revlbranch, revrbranch, _rev=_rev)
         
 Path = Tree
 
@@ -250,7 +267,6 @@ class MultiPath(object):
                 matching_nodes[node] = [result[node] for result in results]
                 
         return matching_nodes
-
 
 def traverse(node, query=None, ancestors=None):
     # d initialise if no ancestors
@@ -273,7 +289,7 @@ def traverse(node, query=None, ancestors=None):
         
     if tree.op == "atom":
         type = tree.lbranch
-        if tree.rev:
+        if tree._rev:
             return {node:[(type,node)] for node in node.get_inbound_nodes(type)[type]}
         else:
             return {node:[(type,node)] for node in node.get_outbound_nodes(type)[type]}
@@ -345,7 +361,7 @@ def traverse(node, query=None, ancestors=None):
         not_nodes = traverse(node, tree.lbranch)
         
         # dict... type:[nodes]
-        all_nodes_dict = node.get_inbound_nodes() if tree.rev else node.get_outbound_nodes()
+        all_nodes_dict = node.get_inbound_nodes() if tree._rev else node.get_outbound_nodes()
         
         actual_nodes = dict()
         
@@ -366,7 +382,14 @@ def traverse(node, query=None, ancestors=None):
                 matching_nodes[candidate] = path
               
         return matching_nodes
-        
+    
+    elif tree.op == "prop":
+        print "here"
+        if getattr(node, tree.lbranch) == tree.rbranch:
+            return {node: []}
+        else:
+            return dict()
+    
     else:
         raise ValueError("Tree operation not supported: {%s}." % tree.op)
         
@@ -386,7 +409,13 @@ class Node(object):
           
     def __getattr__(self, key):
         return self.storage.get_property(self.id, key)
-    
+
+    def __setattr__(self, key, value):
+        if key in ['id', 'storage']: # hack :(
+            object.__setattr__(self, key, value)
+        else:
+            self.storage.set_property(self.id, key, value)
+        
     def __repr__(self):
         #return "%s: %s: %s" % (self.name, uuid.UUID(self.id).int, self.id)
         return self.name

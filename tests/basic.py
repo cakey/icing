@@ -364,7 +364,7 @@ class IFTest(object):
     def setUp(self):
         mySetUp(self)
         
-    def test_if_lol(self):
+    def test_if_basic(self):
         Mother = Path("mother")
         Mothers_with_Mother = Mother.if_has(Mother)
         
@@ -375,6 +375,61 @@ class IFTest(object):
 class PyIFTest(IFTest, unittest.TestCase, PythonBack):    pass
 class ReIFTest(IFTest, unittest.TestCase, RedisBack):    pass
 
+class Properties(object):
+    def setUp(self):
+        mySetUp(self)
+        
+    def test_prop_can_get_and_set_property(self):
+        self.me.age = '21'
+        
+        self.assertEqual(self.g(self.me.id).age, '21')
+    
+    def test_can_use_property_as_a_path(self):
+        age50 = Path(age='50')
+        
+        self.me.age = '49'
+        results = age50(self.me)
+        self.assertEqual(set(results.keys()), set([]))
+        
+        self.me.age = '50'
+        results = age50(self.me)
+        self.assertEqual(set(results.keys()), set([self.me]))
+        
+    def test_can_query_using_properties(self):
+        self.friendlymother.age = '50'
+        
+        Friends_of_age_50 = Path('friend').if_has(Path(age='50'))
+        
+        results = Friends_of_age_50(self.me)
+        
+        self.assertEqual(set(results.keys()), set([self.friendlymother]))
+        
+    def test_can_query_using_properties_inline_if_has(self):
+        self.friendlymother.age = '50'
+        
+        Friends_of_age_50 = Path('friend').if_has(age='50')
+        
+        results = Friends_of_age_50(self.me)
+        
+        self.assertEqual(set(results.keys()), set([self.friendlymother]))
+    
+    def test_can_query_using_multiple_properties_inline_if_has(self):
+        self.friendlymother.age = '50'
+        self.friendlymother.gender = 'female'
+        self.friend.age = '50'
+        self.friend.gender = 'male'
+        
+        Female_Friends_of_age_50 = Path('friend').if_has(age='50', gender='female')
+        
+        results = Female_Friends_of_age_50(self.me)
+        
+        self.assertEqual(set(results.keys()), set([self.friendlymother]))
+        
+    # integer properties?
+    
+class PyProperties(Properties, unittest.TestCase, PythonBack):    pass
+class ReProperties(Properties, unittest.TestCase, RedisBack):    pass
+  
    
 #testclasses = {TestAtomicConstructs, TestParenthesis, TestComposite, TestById, TestById, TestQuestion, TestReverse, TestChain}
 #backs = {RedisBack, PythonBack}
