@@ -34,6 +34,82 @@ import uuid
 
 from storage import PythonStorage
 
+def query_parser(query):
+    if not query:
+        return Tree()
+    
+    if query.startswith("!"):
+        return Tree("!", query_parser(query[1:]))
+        
+    if query.startswith("(") and query.endswith(")"):
+        return query_parser(query[1:-1])
+        
+    if "(" in query and ")" in query:
+        unmatched=0
+        lpos = None
+        rpos = None
+        for i,c in enumerate(query):
+            if c == "(":
+                if unmatched == 0:
+                    lpos = i
+                unmatched += 1
+            if c ==")":
+                unmatched -= 1
+                if unmatched == 0:
+                    rpos = i
+                    break
+                    
+        before = query[0:lpos]
+        during = query[lpos:rpos+1]
+        after = query[rpos+1:]
+        
+        if before:
+            op = "->" if before.endswith("->") else before[-1]
+            lbranch = before[0:-2] if before.endswith("->") else before[0:-1]
+        if after:
+            tree = Tree()
+            tree.op = "->" if after.startswith("->") else after[0]
+            tree.lbranch = during
+            tree.rbranch = after[2:] if after.startswith("->") else after[1:]
+            rbranch = tree
+            if not before:
+                op, lbranch, rbranch = tree.op, tree.lbranch, tree.rbranch
+        else:
+            rbranch=during
+            
+        return Tree(op, lbranch, rbranch)
+    
+    # the order here defines precendence
+    for op in ["->", "&", "|", "-"]:
+        if op in query:
+            branches = query.split(op)
+            lbranch = query_parser(branches[0])
+            rbranch = query_parser(op.join(branches[1:]))
+            return Tree(op, lbranch, rbranch)
+    for op in ('*','+'):
+        if query.endswith(op):
+            return Tree(op, query_parser(query[0:-1]))
+        
+    # causes issues with recursion:
+    #if query.endswith("+"):
+    #    self.op = "->"
+    #    tree = Tree(query[0:-1])
+    #    self.lbranch = tree
+    #    self.rbranch = Tree('*', tree)
+    #    return
+    
+    if query[-1] in string.digits:
+        num = int(query[-1])
+        if num == 0:
+            return Tree()
+        elif num == 1:
+            return query_parser(query[0:-1])
+        else: 
+            tree = query_parser(query[0:-1])
+            return Tree("->", tree, query_parser(query[0:-1] + str(num-1)))
+
+    return Tree("atom", query)
+
 class Tree(object):
     def __init__(self, *args, **kwargs):
         self._rev = kwargs.get("_rev", False)
@@ -42,11 +118,15 @@ class Tree(object):
         self.rbranch = None
         
         props = [key for key in kwargs if key != '_rev']
+        # if there is one property to match against, 
+        # then set the key to lbranch, and the value to rbranch
         if len(props) == 1:
             self.op = 'prop'
             self.lbranch = props[0]
             self.rbranch = kwargs[props[0]]
             return
+        # if there are multiple properties, 
+        # then create a tree for each property then and them together.
         elif len(props) >= 1:
             self.op = '&'
             propdict = {props[0]:kwargs[props[0]]}
@@ -58,18 +138,18 @@ class Tree(object):
         if len(args) == 0:
             self.op = 'self'
             return
-            
+        
+        # standard case of being called with a query string
         if len(args) == 1:
             query = args[0]
-            if not query:
-                self.op = 'self'
-                return
-                
+        
+        # Constructing a tree from 1 arg ops
         if len(args) == 2:
         
             op = args[0]
             tree = args[1]
             if op == "!":
+                # demorgans
                 if tree.op == "&":
                     self.op = "|"
                     self.lbranch = Tree("!", tree.lbranch)
@@ -94,98 +174,18 @@ class Tree(object):
                 self.op = op
                 self.lbranch = tree
             return
-            
+        
+        # constructing a tree from 2 arg ops
         if len(args) == 3:
             self.op = args[0]
             self.lbranch = args[1]
             self.rbranch = args[2]
             return 
         
-        if query.startswith("!"):
-            tree = Tree("!", Tree(query[1:]))
-            self.op, self.lbranch, self.rbranch = tree.op, tree.lbranch, tree.rbranch
-            return
-            
-        if query.startswith("(") and query.endswith(")"):
-            tree = Tree(query[1:-1])
-            self.op, self.lbranch, self.rbranch = tree.op, tree.lbranch, tree.rbranch
-            return
-            
-        if "(" in query and ")" in query:
-            unmatched=0
-            lpos = None
-            rpos = None
-            for i,c in enumerate(query):
-                if c == "(":
-                    if unmatched == 0:
-                        lpos = i
-                    unmatched += 1
-                if c ==")":
-                    unmatched -= 1
-                    if unmatched == 0:
-                        rpos = i
-                        break
-                        
-            before = query[0:lpos]
-            during = query[lpos:rpos+1]
-            after = query[rpos+1:]
-            
-            if before:
-                self.op = "->" if before.endswith("->") else before[-1]
-                self.lbranch = before[0:-2] if before.endswith("->") else before[0:-1]
-            if after:
-                tree = Tree()
-                tree.op = "->" if after.startswith("->") else after[0]
-                tree.lbranch = during
-                tree.rbranch = after[2:] if after.startswith("->") else after[1:]
-                self.rbranch = tree
-                if not before:
-                    self.op, self.lbranch, self.rbranch = tree.op, tree.lbranch, tree.rbranch
-            else:
-                self.rbranch=during
-                
-            return
+        # else we have a query
         
-        # the order here defines precendence
-        for op in ["->", "&", "|", "-"]:
-            if op in query:
-                self.op = op
-                branches = query.split(op)
-                self.lbranch = Tree(branches[0])
-                self.rbranch = Tree(op.join(branches[1:]))
-                return
-        for op in ('*','+'):
-            if query.endswith(op):
-                self.op = op
-                self.lbranch = Tree(query[0:-1])
-                return
-            
-        # causes issues with recursion:
-        #if query.endswith("+"):
-        #    self.op = "->"
-        #    tree = Tree(query[0:-1])
-        #    self.lbranch = tree
-        #    self.rbranch = Tree('*', tree)
-        #    return
-        
-        if query[-1] in string.digits:
-            num = int(query[-1])
-            if num == 0:
-                self.op = "self"
-                return
-            elif num == 1:
-                tree = Tree(query[0:-1])
-                self.op, self.lbranch, self.rbranch = tree.op, tree.lbranch, tree.rbranch
-                return
-            else: 
-                tree = Tree(query[0:-1])
-                self.op = "->"
-                self.lbranch = tree
-                self.rbranch = Tree(query[0:-1] + str(num-1))
-                return
-        
-        self.op = "atom"
-        self.lbranch = query
+        tree = query_parser(query)
+        self.op, self.lbranch, self.rbranch = tree.op, tree.lbranch, tree.rbranch
             
     def __repr__(self):
         return "%s(%s,%s)" % (self.op, self.lbranch, self.rbranch)
@@ -277,26 +277,26 @@ def traverse(node, query=None, ancestors=None):
     if ancestors is None:
         ancestors = set()
         
-    if query is None:# or node in ancestors:
+    if query is None:
         return {node:[]}
-    #else:
-    #    ancestors.add(node)
+
         
     if isinstance(query, str):
         tree = Tree(query)
     else:
         tree = query
-        
-    if tree.op == "atom":
+    
+    def atom(node, tree):
         type = tree.lbranch
         if tree._rev:
             return {node:[(type,node)] for node in node.get_inbound_nodes(type)[type]}
         else:
             return {node:[(type,node)] for node in node.get_outbound_nodes(type)[type]}
-    elif tree.op == "self":
+     
+    def identity(node, tree):
         return {node:[]}
-        
-    elif tree.op == "->":
+
+    def concatenation(node, tree):
         match_all = collections.defaultdict(list)
         match_left = traverse(node,tree.lbranch)
 
@@ -307,7 +307,7 @@ def traverse(node, query=None, ancestors=None):
             
         return match_all            
     
-    elif tree.op == "-":
+    def difference(node, tree):
         left = traverse(node, tree.lbranch)
         right = traverse(node, tree.rbranch)
         returnee = {}
@@ -316,7 +316,7 @@ def traverse(node, query=None, ancestors=None):
                 returnee[key] = path
         return returnee
     
-    elif tree.op == "&":
+    def intersection(node, tree):
         left = traverse(node, tree.lbranch)
         right = traverse(node, tree.rbranch)
         returnee = {}
@@ -325,13 +325,13 @@ def traverse(node, query=None, ancestors=None):
                 returnee[key] = path
         return returnee
     
-    elif tree.op == "|":
+    def union(node, tree):
         left = traverse(node, tree.lbranch)
         right = traverse(node, tree.rbranch)
         left.update(right)
         return left
     
-    elif tree.op == "+":
+    def one_or_more(node, tree):
         if node in ancestors:
             return {}
         ancestors.add(node)
@@ -345,8 +345,8 @@ def traverse(node, query=None, ancestors=None):
             for rnode, rpath in traverse(lnode, tree, ancestors).iteritems():
                 final_nodes[rnode] = lpath+rpath
         return final_nodes
-           
-    elif tree.op == "*":
+    
+    def zero_or_more(node, tree):
         final_nodes = {node:[]}
         if node in ancestors:
             return {}
@@ -356,7 +356,7 @@ def traverse(node, query=None, ancestors=None):
                 final_nodes[rnode] = lpath+rpath
         return final_nodes
     
-    elif tree.op == "!":
+    def complement(node, tree):
         # set of nodes with paths
         not_nodes = traverse(node, tree.lbranch)
         
@@ -372,8 +372,8 @@ def traverse(node, query=None, ancestors=None):
                     actual_nodes[node] = [(type,node)]
                     
         return actual_nodes
-        
-    elif tree.op == "if":
+    
+    def conditional(node, tree):
         candidates = traverse(node, tree.lbranch)
         
         matching_nodes = {}
@@ -383,15 +383,28 @@ def traverse(node, query=None, ancestors=None):
               
         return matching_nodes
     
-    elif tree.op == "prop":
-        print "here"
+    def property(node, tree):
         if getattr(node, tree.lbranch) == tree.rbranch:
             return {node: []}
         else:
             return dict()
     
-    else:
+    def default(node, tree):
         raise ValueError("Tree operation not supported: {%s}." % tree.op)
+        
+    interpreter = {'atom':atom,
+                   'self':identity,
+                   '->':concatenation,
+                   '-':difference,
+                   '&':intersection,
+                   '|':union,
+                   '+':one_or_more,
+                   '*':zero_or_more,
+                   '!':complement,
+                   'if':conditional,
+                   'prop':property}
+    
+    return interpreter.get(tree.op, default)(node, tree)
         
 class Node(object):
     def __init__(self, node_id, storage):
