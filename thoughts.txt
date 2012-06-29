@@ -1,0 +1,19 @@
+Time based version control: 
+
+    Nodes are defined by edges and properties
+    Whenever an edge changes store the change (timestamp+newvalue)
+        This needs to be in sorted order to allow log n lookup of edges of relevant time stamp
+            linkedlist?
+    Whenever a property store the change (timestamp/value)
+    A node exists at a timestamp if it has any properties/ingoing/outgoing edges at that time.
+        Properties stored in sorted order by property
+        
+    Store in logn sorted order
+       
+    Traversing
+        Get type Y edges of node Z 
+        At latest timestamp - can see all properties/edges ever - have head to sorted order so O(1) per property/edge
+        
+        In Past
+            Just log(n) to the appropriate property/edge per node...
+
